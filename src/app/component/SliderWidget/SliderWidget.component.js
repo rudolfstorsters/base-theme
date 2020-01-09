@@ -18,6 +18,9 @@ import Html from 'Component/Html';
 import isMobile from 'Util/Mobile';
 import './SliderWidget.style';
 
+export const TABLET_WIDTH = 768;
+export const DESKTOP_WIDTH = 1201;
+
 /**
  * Homepage slider
  * @class SliderWidget
@@ -26,6 +29,9 @@ export default class SliderWidget extends PureComponent {
     static propTypes = {
         slider: PropTypes.shape({
             title: PropTypes.string,
+            slides_to_display: PropTypes.number,
+            slides_to_display_mobile: PropTypes.number,
+            slides_to_display_tablet: PropTypes.number,
             slides: PropTypes.arrayOf(
                 PropTypes.shape({
                     desktop_image: PropTypes.string,
@@ -41,7 +47,59 @@ export default class SliderWidget extends PureComponent {
         slider: [{}]
     };
 
-    state = { activeImage: 0 };
+    state = { activeImage: 0, slideWidth: 100 };
+
+    componentDidMount() {
+        this.updateWindowDimensions();
+        window.addEventListener('resize', this.updateWindowDimensions);
+    }
+
+    componentDidUpdate(prevProps) {
+        const {
+            slider: {
+                slides_to_display,
+                slides_to_display_tablet
+            }
+        } = this.props;
+        const {
+            slider: {
+                slides_to_display: prev_slides_to_display,
+                slides_to_display_tablet: prev_slides_to_display_tablet
+            }
+        } = prevProps;
+
+        if (prev_slides_to_display !== slides_to_display
+            && prev_slides_to_display_tablet !== slides_to_display_tablet) {
+            this.updateWindowDimensions();
+        }
+    }
+
+    componentWillUnmount() {
+        window.removeEventListener('resize', this.updateWindowDimensions);
+    }
+
+    updateWindowDimensions = () => {
+        const {
+            slider: {
+                slides_to_display,
+                slides_to_display_tablet,
+                slides_to_display_mobile
+            }
+        } = this.props;
+
+        const HUNDRED_PERCENT = 100;
+
+        if (window.innerWidth >= DESKTOP_WIDTH) {
+            const slidesQtyPerPage = slides_to_display || 1;
+            this.setState({ slideWidth: HUNDRED_PERCENT / slidesQtyPerPage });
+        } else if (window.innerWidth >= TABLET_WIDTH) {
+            const slidesQtyPerPage = slides_to_display_tablet || 1;
+            this.setState({ slideWidth: HUNDRED_PERCENT / slidesQtyPerPage });
+        } else {
+            const slidesQtyPerPage = slides_to_display_mobile || 1;
+            this.setState({ slideWidth: HUNDRED_PERCENT / slidesQtyPerPage });
+        }
+    };
 
 
     onActiveImageChange = (activeImage) => {
@@ -72,11 +130,16 @@ export default class SliderWidget extends PureComponent {
             title: block
         } = slide;
 
+        const {
+            slideWidth
+        } = this.state;
+
         return (
             <figure
               block="SliderWidget"
               elem="Figure"
               key={ i }
+              style={ { width: `${ slideWidth }%` } }
             >
                 <Image
                   mix={ { block: 'SliderWidget', elem: 'FigureImage' } }
@@ -97,7 +160,24 @@ export default class SliderWidget extends PureComponent {
 
     render() {
         const { activeImage } = this.state;
-        const { slider: { slides, title: block } } = this.props;
+
+        const {
+            slider: {
+                slides,
+                title: block,
+                slides_to_display,
+                slides_to_display_tablet,
+                slides_to_display_mobile
+            }
+        } = this.props;
+
+        if (
+            slides_to_display === undefined
+            || slides_to_display_tablet === undefined
+            || slides_to_display_mobile === undefined
+        ) {
+            return null;
+        }
 
         return (
             <Slider
@@ -105,6 +185,9 @@ export default class SliderWidget extends PureComponent {
               showCrumbs
               activeImage={ activeImage }
               onActiveImageChange={ this.onActiveImageChange }
+              slidesOnDesktop={ slides_to_display }
+              slidesOnTablet={ slides_to_display_tablet }
+              slidesOnMobile={ slides_to_display_mobile }
             >
                 { slides.map(this.renderSlide) }
             </Slider>

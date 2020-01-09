@@ -19,6 +19,11 @@ import Draggable from 'Component/Draggable';
 import isMobile from 'Util/Mobile';
 import CSS from 'Util/CSS';
 
+import {
+    TABLET_WIDTH,
+    DESKTOP_WIDTH
+} from 'Component/SliderWidget/SliderWidget.component';
+
 import './Slider.style';
 
 export const ANIMATION_DURATION = 300;
@@ -35,7 +40,10 @@ export default class Slider extends PureComponent {
         onActiveImageChange: PropTypes.func,
         mix: MixType,
         children: ChildrenType.isRequired,
-        isInteractionDisabled: PropTypes.bool
+        isInteractionDisabled: PropTypes.bool,
+        slidesOnDesktop: PropTypes.number,
+        slidesOnTablet: PropTypes.number,
+        slidesOnMobile: PropTypes.number
     };
 
     static defaultProps = {
@@ -43,12 +51,19 @@ export default class Slider extends PureComponent {
         onActiveImageChange: () => {},
         showCrumbs: false,
         isInteractionDisabled: false,
-        mix: {}
+        mix: {},
+        slidesOnDesktop: 0,
+        slidesOnTablet: 0,
+        slidesOnMobile: 0
     };
 
     sliderWidth = 0;
 
+    slideWidth = 0;
+
     prevPosition = 0;
+
+    slidesQty = 0;
 
     draggableRef = createRef();
 
@@ -68,7 +83,8 @@ export default class Slider extends PureComponent {
         const { activeImage } = this.props;
 
         this.state = {
-            prevActiveImage: activeImage
+            prevActiveImage: activeImage,
+            slidesQtyPerPage: 1
         };
     }
 
@@ -92,6 +108,9 @@ export default class Slider extends PureComponent {
             return;
         }
 
+        this.updateWindowDimensions();
+        window.addEventListener('resize', this.updateWindowDimensions);
+
         sliderChildren[0].onload = () => {
             CSS.setVariable(this.sliderRef, 'slider-height', `${sliderChildren[0].offsetHeight}px`);
         };
@@ -106,7 +125,7 @@ export default class Slider extends PureComponent {
         const { activeImage } = this.props;
 
         if (activeImage !== prevActiveImage) {
-            const newTranslate = -activeImage * this.sliderWidth;
+            const newTranslate = Math.max(-activeImage * this.slideWidth, -this.getDraggableAreaWidth());
 
             CSS.setVariable(
                 this.draggableRef,
@@ -121,6 +140,30 @@ export default class Slider extends PureComponent {
             );
         }
     }
+
+    componentWillUnmount() {
+        window.removeEventListener('resize', this.updateWindowDimensions);
+    }
+
+    updateWindowDimensions = () => {
+        const { slidesOnDesktop, slidesOnTablet, slidesOnMobile } = this.props;
+        const { offsetWidth: sliderWidth = 0 } = this.draggableRef.current || {};
+        this.sliderWidth = sliderWidth;
+        if (window.innerWidth >= DESKTOP_WIDTH) {
+            const slidesQtyPerPage = slidesOnDesktop || 1;
+            this.setState({ slidesQtyPerPage });
+            this.slideWidth = sliderWidth / slidesQtyPerPage;
+        } else if (window.innerWidth >= TABLET_WIDTH) {
+            const slidesQtyPerPage = slidesOnTablet || 1;
+            this.setState({ slidesQtyPerPage });
+            this.slideWidth = sliderWidth / slidesQtyPerPage;
+        } else {
+            const slidesQtyPerPage = slidesOnMobile || 1;
+            this.setState({ slidesQtyPerPage });
+            this.slideWidth = sliderWidth / slidesQtyPerPage;
+        }
+        this.changeActiveImage(0);
+    };
 
     onClickChangeSlide(state, slideSize, lastTranslate, fullSliderSize) {
         const { originalX } = state;
@@ -154,8 +197,11 @@ export default class Slider extends PureComponent {
     }
 
     getFullSliderWidth() {
-        const fullSliderWidth = this.draggableRef.current.scrollWidth;
-        return fullSliderWidth - this.sliderWidth;
+        return this.slidesQty * this.slideWidth;
+    }
+
+    getDraggableAreaWidth() {
+        return this.getFullSliderWidth() - this.sliderWidth;
     }
 
     calculateNextSlide(state) {
@@ -166,16 +212,16 @@ export default class Slider extends PureComponent {
 
         const { onActiveImageChange } = this.props;
 
-        const slideSize = this.sliderWidth;
+        const slideSize = this.slideWidth;
 
-        const fullSliderSize = this.getFullSliderWidth();
+        const draggableAreaWidth = this.getDraggableAreaWidth();
 
         const activeSlidePosition = translate / slideSize;
         const activeSlidePercent = Math.abs(activeSlidePosition % 1);
         const isSlideBack = translate > lastTranslate;
 
         if (!translate) {
-            return this.onClickChangeSlide(state, slideSize, lastTranslate, fullSliderSize);
+            return this.onClickChangeSlide(state, slideSize, lastTranslate, draggableAreaWidth);
         }
 
         if (translate >= 0) {
@@ -183,8 +229,8 @@ export default class Slider extends PureComponent {
             return 0;
         }
 
-        if (translate < -fullSliderSize) {
-            const activeSlide = Math.round(fullSliderSize / -slideSize);
+        if (translate < -draggableAreaWidth) {
+            const activeSlide = Math.floor(draggableAreaWidth / -slideSize);
             onActiveImageChange(-activeSlide);
             return activeSlide;
         }
@@ -215,30 +261,34 @@ export default class Slider extends PureComponent {
 
         const translate = translateX;
 
-        const fullSliderSize = this.getFullSliderWidth();
+        const draggableAreaWidth = this.getDraggableAreaWidth();
 
-        if (translate < 0 && translate > -fullSliderSize) {
+        if (translate < 0 && translate > -draggableAreaWidth) {
             CSS.setVariable(
                 this.draggableRef,
                 'translateX',
-                `${translate}px`
+                `${Math.max(translate, -draggableAreaWidth)}px`
             );
         }
     }
 
     handleDragEnd(state, callback) {
         const activeSlide = this.calculateNextSlide(state);
+        const slideSize = this.slideWidth;
+        const { slidesQtyPerPage } = this.state;
 
-        const slideSize = this.sliderWidth;
+        const draggableAreaWidth = this.getDraggableAreaWidth();
 
-        const newTranslate = activeSlide * slideSize;
+        const newTranslate = activeSlide === -(this.slidesQty - Math.floor(slidesQtyPerPage))
+            ? -draggableAreaWidth + 1
+            : activeSlide * slideSize;
 
         CSS.setVariable(this.draggableRef, 'animation-speed', '300ms');
 
         CSS.setVariable(
             this.draggableRef,
             'translateX',
-            `${newTranslate}px`
+            `${Math.max(newTranslate, -draggableAreaWidth)}px`
         );
 
         callback({
@@ -286,7 +336,15 @@ export default class Slider extends PureComponent {
 
     renderCrumb(_, i) {
         const { activeImage } = this.props;
+        const { slidesQtyPerPage } = this.state;
         const isActive = i === Math.abs(-activeImage);
+
+        if ( // to show only slidesQtyPerPage amount of crumbs
+            i > (this.slidesQty - Math.floor(slidesQtyPerPage))
+            || this.slidesQty <= Math.floor(slidesQtyPerPage)
+        ) {
+            return null;
+        }
 
         return (
             <button
@@ -312,6 +370,8 @@ export default class Slider extends PureComponent {
             children
         } = this.props;
 
+        this.slidesQty = children.length;
+
         return (
             <div
               block="Slider"
@@ -325,7 +385,7 @@ export default class Slider extends PureComponent {
                   onDragEnd={ this.handleDragEnd }
                   onDrag={ this.handleDrag }
                   onClick={ this.handleClick }
-                  shiftX={ -activeImage * this.sliderWidth }
+                  shiftX={ -activeImage * this.slideWidth }
                 >
                     { children }
                 </Draggable>
