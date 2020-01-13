@@ -122,7 +122,9 @@ export default class Slider extends PureComponent {
 
     componentDidUpdate(prevProps) {
         const { activeImage: prevActiveImage } = prevProps;
-        const { activeImage } = this.props;
+        const { activeImage, children } = this.props;
+
+        this.slidesQty = children.length;
 
         if (activeImage !== prevActiveImage) {
             const newTranslate = Math.max(-activeImage * this.slideWidth, -this.getDraggableAreaWidth());
@@ -149,6 +151,7 @@ export default class Slider extends PureComponent {
         const { slidesOnDesktop, slidesOnTablet, slidesOnMobile } = this.props;
         const { offsetWidth: sliderWidth = 0 } = this.draggableRef.current || {};
         this.sliderWidth = sliderWidth;
+
         if (window.innerWidth >= DESKTOP_WIDTH) {
             const slidesQtyPerPage = slidesOnDesktop || 1;
             this.setState({ slidesQtyPerPage });
@@ -162,6 +165,7 @@ export default class Slider extends PureComponent {
             this.setState({ slidesQtyPerPage });
             this.slideWidth = sliderWidth / slidesQtyPerPage;
         }
+
         this.changeActiveImage(0);
     };
 
@@ -369,8 +373,6 @@ export default class Slider extends PureComponent {
             activeImage,
             children
         } = this.props;
-
-        this.slidesQty = children.length;
 
         return (
             <div
