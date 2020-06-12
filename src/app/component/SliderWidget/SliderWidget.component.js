@@ -185,9 +185,9 @@ export default class SliderWidget extends PureComponent {
               showCrumbs
               activeImage={ activeImage }
               onActiveImageChange={ this.onActiveImageChange }
-              slidesOnDesktop={ slides_to_display }
-              slidesOnTablet={ slides_to_display_tablet }
-              slidesOnMobile={ slides_to_display_mobile }
+              slidesOnDesktop={ slides_to_display || 1 }
+              slidesOnTablet={ slides_to_display_tablet || 1 }
+              slidesOnMobile={ slides_to_display_mobile || 1 }
             >
                 { slides.map(this.renderSlide) }
             </Slider>
